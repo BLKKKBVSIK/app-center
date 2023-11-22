@@ -120,6 +120,7 @@ class _ManageView extends ConsumerWidget {
             itemCount: manageModel.refreshableSnaps.length,
             itemBuilder: (context, index) => _ManageSnapTile(
               snap: manageModel.refreshableSnaps.elementAt(index),
+              isRefreshable: true,
               position: index == (manageModel.refreshableSnaps.length - 1)
                   ? index == 0
                       ? ManageTilePosition.single
@@ -315,8 +316,10 @@ class _ManageSnapTile extends ConsumerWidget {
   const _ManageSnapTile({
     required this.snap,
     this.position = ManageTilePosition.middle,
+    this.isRefreshable = false,
   });
 
+  final bool isRefreshable;
   final Snap snap;
   final ManageTilePosition position;
 
@@ -328,6 +331,7 @@ class _ManageSnapTile extends ConsumerWidget {
     final daysSinceUpdate = snap.installDate != null
         ? DateTime.now().difference(snap.installDate!).inDays
         : null;
+    final snapModel = ref.watch(snapModelProvider(snap.name));
 
     return ListTile(
       key: ValueKey(snap.id),
@@ -389,6 +393,7 @@ class _ManageSnapTile extends ConsumerWidget {
                   : const SizedBox(),
             ),
             Expanded(
+              flex: 1,
               child: snap.installedSize != null
                   ? Text(
                       context.formatByteSize(
@@ -440,42 +445,82 @@ class _ManageSnapTile extends ConsumerWidget {
             )
         ],
       ),
-      trailing: ButtonBar(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Visibility(
-            maintainSize: true,
-            maintainAnimation: true,
-            maintainState: true,
-            visible: snapLauncher.isLaunchable,
-            child: OutlinedButton(
-              onPressed: snapLauncher.open,
-              child: Text(l10n.snapActionOpenLabel),
-            ),
-          ),
-          MenuAnchor(
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () =>
-                    StoreNavigator.pushSnap(context, name: snap.name),
-                child: Text(
-                  l10n.managePageShowDetailsLabel,
-                  style: Theme.of(context).textTheme.bodyMedium,
+      trailing: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 150),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            OverflowBar(
+              spacing: 8.0,
+              children: [
+                Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: isRefreshable || snapLauncher.isLaunchable,
+                  child: OutlinedButton(
+                    onPressed: isRefreshable
+                        ? SnapAction.update.callback(snapModel)
+                        : snapLauncher.open,
+                    child: isRefreshable
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(YaruIcons.download),
+                              const SizedBox(width: 8),
+                              Text(
+                                l10n.snapActionUpdateLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          )
+                        : Text(l10n.snapActionOpenLabel),
+                  ),
                 ),
-              )
-            ],
-            builder: (context, controller, child) => YaruOptionButton(
-              onPressed: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              child: const Icon(YaruIcons.view_more_horizontal),
+                MenuAnchor(
+                  menuChildren: [
+                    if (isRefreshable)
+                      MenuItemButton(
+                        onPressed: () => snapLauncher.open(),
+                        child: Text(
+                          l10n.snapActionOpenLabel,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    MenuItemButton(
+                      onPressed: () =>
+                          SnapAction.remove.callback(snapModel)?.call(),
+                      child: Text(
+                        l10n.snapActionRemoveLabel,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    MenuItemButton(
+                      onPressed: () =>
+                          StoreNavigator.pushSnap(context, name: snap.name),
+                      child: Text(
+                        l10n.managePageShowDetailsLabel,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    )
+                  ],
+                  builder: (context, controller, child) => YaruOptionButton(
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                    child: const Icon(YaruIcons.view_more_horizontal),
+                  ),
+                )
+              ],
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }
